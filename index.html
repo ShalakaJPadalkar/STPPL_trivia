@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STPPL Brain Battle</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:linear-gradient(135deg,#667eea,#764ba2);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+  padding:15px;
+}
+.container{
+  background:white;
+  width:100%;
+  max-width:900px;
+  padding:25px;
+  border-radius:14px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.2);
+}
+h1,h2,h3{margin:10px 0}
+input{
+  padding:12px;
+  width:100%;
+  border-radius:8px;
+  border:1px solid #ccc;
+  font-size:16px;
+}
+button{
+  padding:12px;
+  width:100%;
+  margin-top:10px;
+  border:none;
+  border-radius:8px;
+  font-size:16px;
+  cursor:pointer;
+  background:#667eea;
+  color:white;
+}
+button:hover{opacity:0.9}
+.option-btn{
+  background:#f4f4f4;
+  color:black;
+  border:1px solid #ddd;
+}
+.correct{background:#c8e6c9 !important}
+.wrong{background:#ffcdd2 !important}
+.top-bar{
+  display:flex;
+  justify-content:space-between;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+.timer-bar{
+  height:8px;
+  background:#ddd;
+  border-radius:5px;
+  overflow:hidden;
+  margin-bottom:15px;
+}
+.timer-progress{
+  height:8px;
+  background:#4caf50;
+  width:100%;
+}
+@media(max-width:600px){
+  .container{padding:15px}
+  h1{font-size:20px}
+  button{font-size:14px}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div id="login">
+<h1>STPPL Brain Battle</h1>
+<input id="username" placeholder="Enter your name">
+<button onclick="startQuiz()">Start Quiz</button>
+</div>
+
+<div id="quiz" style="display:none;">
+<div class="top-bar">
+<div>Question <span id="qNumber"></span>/20</div>
+<div>⏳ <span id="timeLeft">30</span>s</div>
+</div>
+
+<div class="timer-bar">
+<div id="timerProgress" class="timer-progress"></div>
+</div>
+
+<h3 id="questionText"></h3>
+<div id="options"></div>
+
+<button id="nextBtn" onclick="nextQuestion()" style="display:none;">Next Question</button>
+</div>
+
+<div id="result" style="display:none;"></div>
+
+</div>
+
+<script>
+
+// ================= GOOGLE SHEET WEBHOOK =================
+const SHEET_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzzUIzTWFjfLSOEWzoH0BHcg9vnASOIqHTPchLyVBBGFxZaNj1TZR54fpWm_aGxTbrp/exec";
+
+// ================= YOUR FULL 50 QUESTIONS =================
+// IMPORTANT: I am including structure only here due to length.
+// Paste your FULL 50 question array exactly as in your previous file.
+// Example format below:
+
+const QUESTION_BANK = [
+  { id: 1, difficulty: "easy", question: "Which fruit is known as the 'King of Fruits' in India? / भारतात कोणत्या फळाला 'फळांचा राजा' मानले जाते?", options: ["Apple / सफरचंद","Mango / आंबा","Banana / केळी","Grapes / द्राक्षे"], answerIndex: 1 },
+
+{ id: 2, difficulty: "easy", question: "What is the capital of India? / भारताची राजधानी कोणती आहे?", options: ["Mumbai / मुंबई","Kolkata / कोलकाता","New Delhi / नवी दिल्ली","Chennai / चेन्नई"], answerIndex: 2 },
+
+{ id: 3, difficulty: "easy", question: "How many days are there in a week? / आठवड्यात किती दिवस असतात?", options: ["5 / पाच","6 / सहा","7 / सात","8 / आठ"], answerIndex: 2 },
+
+{ id: 4, difficulty: "easy", question: "Which planet is known as the Red Planet? / कोणता ग्रह लाल ग्रह म्हणून ओळखला जातो?", options: ["Earth / पृथ्वी","Mars / मंगळ","Jupiter / गुरू","Venus / शुक्र"], answerIndex: 1 },
+
+{ id: 5, difficulty: "easy", question: "Which festival is known as the festival of lights? / दिव्यांचा सण कोणता आहे?", options: ["Holi / होळी","Diwali / दिवाळी","Eid / ईद","Christmas / ख्रिसमस"], answerIndex: 1 },
+
+{ id: 6, difficulty: "easy", question: "Which animal is called the King of the Jungle? / जंगलाचा राजा कोण?", options: ["Tiger / वाघ","Lion / सिंह","Elephant / हत्ती","Leopard / बिबट्या"], answerIndex: 1 },
+
+{ id: 7, difficulty: "easy", question: "Which bird is the national bird of India? / भारताचा राष्ट्रीय पक्षी कोणता आहे?", options: ["Sparrow / चिमणी","Crow / कावळा","Peacock / मोर","Parrot / पोपट"], answerIndex: 2 },
+
+{ id: 8, difficulty: "easy", question: "How many colors are there in a rainbow? / इंद्रधनुष्यात किती रंग असतात?", options: ["6 / सहा","7 / सात","8 / आठ","9 / नऊ"], answerIndex: 1 },
+
+{ id: 9, difficulty: "easy", question: "Which gas do humans breathe in? / माणूस कोणता वायू श्वासात घेतो?", options: ["Oxygen / प्राणवायू","Nitrogen / नायट्रोजन","Carbon dioxide / कार्बन डायऑक्साइड","Helium / हेलियम"], answerIndex: 0 },
+
+{ id: 10, difficulty: "easy", question: "How many months are there in a year? / वर्षात किती महिने असतात?", options: ["10 / दहा","11 / अकरा","12 / बारा","13 / तेरा"], answerIndex: 2 },
+
+{ id: 11, difficulty: "medium", question: "Which is the largest planet in our solar system? / आपल्या सौरमालेतील सर्वात मोठा ग्रह कोणता?", options: ["Earth / पृथ्वी","Mars / मंगळ","Jupiter / गुरू","Saturn / शनी"], answerIndex: 2 },
+
+{ id: 12, difficulty: "medium", question: "Who is known as the Father of the Nation in India? / भारताचे राष्ट्रपिता कोण?", options: ["Jawaharlal Nehru / जवाहरलाल नेहरू","Mahatma Gandhi / महात्मा गांधी","Sardar Patel / सरदार पटेल","B. R. Ambedkar / डॉ. बाबासाहेब आंबेडकर"], answerIndex: 1 },
+
+{ id: 13, difficulty: "medium", question: "In which year did India get independence? / भारताला स्वातंत्र्य कोणत्या वर्षी मिळाले?", options: ["1945 / १९४५","1946 / १९४६","1947 / १९४७","1950 / १९५०"], answerIndex: 2 },
+
+{ id: 14, difficulty: "medium", question: "Which is the largest continent? / सर्वात मोठा खंड कोणता?", options: ["Africa / आफ्रिका","Europe / युरोप","Asia / आशिया","Australia / ऑस्ट्रेलिया"], answerIndex: 2 },
+
+{ id: 15, difficulty: "medium", question: "How many players are there in a cricket team? / क्रिकेट संघात किती खेळाडू असतात?", options: ["9 / नऊ","10 / दहा","11 / अकरा","12 / बारा"], answerIndex: 2 },
+
+{ id: 16, difficulty: "medium", question: "Which is the fastest land animal? / सर्वात वेगवान स्थल प्राणी कोणता?", options: ["Lion / सिंह","Cheetah / चित्ता","Horse / घोडा","Tiger / वाघ"], answerIndex: 1 },
+
+{ id: 17, difficulty: "medium", question: "What is H2O commonly known as? / H2O ला सामान्यतः काय म्हणतात?", options: ["Salt / मीठ","Water / पाणी","Oxygen / प्राणवायू","Hydrogen / हायड्रोजन"], answerIndex: 1 },
+
+{ id: 18, difficulty: "medium", question: "Which is the highest mountain in the world? / जगातील सर्वात उंच पर्वत कोणता?", options: ["K2 / के२","Mount Everest / माऊंट एव्हरेस्ट","Kanchenjunga / कांचनजुंगा","Nanda Devi / नंदा देवी"], answerIndex: 1 },
+
+{ id: 19, difficulty: "medium", question: "Which is the national animal of India? / भारताचा राष्ट्रीय प्राणी कोणता?", options: ["Lion / सिंह","Tiger / वाघ","Elephant / हत्ती","Leopard / बिबट्या"], answerIndex: 1 },
+
+{ id: 20, difficulty: "medium", question: "Which vitamin do we get from sunlight? / सूर्यप्रकाशातून कोणते जीवनसत्त्व मिळते?", options: ["Vitamin A / जीवनसत्त्व A","Vitamin B / जीवनसत्त्व B","Vitamin C / जीवनसत्त्व C","Vitamin D / जीवनसत्त्व D"], answerIndex: 3 },
+
+{ id: 21, difficulty: "hard", question: "Who invented the telephone? / टेलिफोनचा शोध कोणी लावला?", options: ["Thomas Edison / थॉमस एडिसन","Alexander Graham Bell / अलेक्झांडर ग्रॅहम बेल","Newton / न्यूटन","Einstein / आइन्स्टाईन"], answerIndex: 1 },
+
+{ id: 22, difficulty: "hard", question: "Which blood group is known as the universal donor? / कोणता रक्तगट सार्वत्रिक दाता म्हणून ओळखला जातो?", options: ["A / A","B / B","AB / AB","O Negative / O निगेटिव्ह"], answerIndex: 3 },
+
+{ id: 23, difficulty: "hard", question: "How many continents are there in the world? / जगात किती खंड आहेत?", options: ["5 / पाच","6 / सहा","7 / सात","8 / आठ"], answerIndex: 2 },
+
+{ id: 24, difficulty: "hard", question: "Which is the longest river in the world? / जगातील सर्वात लांब नदी कोणती?", options: ["Amazon / अमेझॉन","Nile / नाईल","Yangtze / यांगत्से","Mississippi / मिसिसिपी"], answerIndex: 1 },
+
+{ id: 25, difficulty: "hard", question: "Which metal is liquid at room temperature? / खोलीच्या तापमानात द्रवरूप असलेले धातू कोणते?", options: ["Gold / सोने","Mercury / पारा","Iron / लोखंड","Silver / चांदी"], answerIndex: 1 },
+
+{ id: 26, difficulty: "easy", question: "How many hours are there in a day? / एका दिवसात किती तास असतात?", options: ["12 / बारा","18 / अठरा","24 / चोवीस","48 / अठ्ठेचाळीस"], answerIndex: 2 },
+
+{ id: 27, difficulty: "easy", question: "Which shape has three sides? / तीन बाजू असलेला आकार कोणता?", options: ["Square / चौकोन","Circle / वर्तुळ","Triangle / त्रिकोण","Rectangle / आयत"], answerIndex: 2 },
+
+{ id: 28, difficulty: "easy", question: "Which animal gives us milk? / आपल्याला दूध कोणता प्राणी देतो?", options: ["Dog / कुत्रा","Cat / मांजर","Cow / गाय","Horse / घोडा"], answerIndex: 2 },
+
+{ id: 29, difficulty: "easy", question: "Which day is celebrated as Republic Day in India? / भारतात प्रजासत्ताक दिन कधी साजरा केला जातो?", options: ["15 August / १५ ऑगस्ट","26 January / २६ जानेवारी","2 October / २ ऑक्टोबर","14 November / १४ नोव्हेंबर"], answerIndex: 1 },
+
+{ id: 30, difficulty: "easy", question: "Which is a water animal? / पाण्यात राहणारा प्राणी कोणता?", options: ["Dog / कुत्रा","Cat / मांजर","Fish / मासा","Cow / गाय"], answerIndex: 2 },
+
+{ id: 31, difficulty: "medium", question: "Which is the smallest prime number? / सर्वात लहान मूळ संख्या कोणती?", options: ["1 / एक","2 / दोन","3 / तीन","5 / पाच"], answerIndex: 1 },
+
+{ id: 32, difficulty: "medium", question: "Which is the national flower of India? / भारताचे राष्ट्रीय फूल कोणते?", options: ["Rose / गुलाब","Lotus / कमळ","Sunflower / सूर्यफूल","Lily / लिली"], answerIndex: 1 },
+
+{ id: 33, difficulty: "medium", question: "Who was the first Prime Minister of India? / भारताचे पहिले पंतप्रधान कोण होते?", options: ["Mahatma Gandhi / महात्मा गांधी","Jawaharlal Nehru / जवाहरलाल नेहरू","Sardar Patel / सरदार पटेल","Rajendra Prasad / राजेंद्र प्रसाद"], answerIndex: 1 },
+
+{ id: 34, difficulty: "medium", question: "Which is the largest ocean in the world? / जगातील सर्वात मोठा महासागर कोणता?", options: ["Indian Ocean / हिंद महासागर","Atlantic Ocean / अटलांटिक महासागर","Pacific Ocean / पॅसिफिक महासागर","Arctic Ocean / आर्क्टिक महासागर"], answerIndex: 2 },
+
+{ id: 35, difficulty: "medium", question: "How many players are there in a football team? / फुटबॉल संघात किती खेळाडू असतात?", options: ["9 / नऊ","10 / दहा","11 / अकरा","12 / बारा"], answerIndex: 2 },
+
+{ id: 36, difficulty: "medium", question: "Which instrument is used to measure temperature? / तापमान मोजण्यासाठी कोणते उपकरण वापरले जाते?", options: ["Barometer / बारोमीटर","Thermometer / थर्मामीटर","Speedometer / स्पीडोमीटर","Compass / कंपास"], answerIndex: 1 },
+
+{ id: 37, difficulty: "medium", question: "Which is the tallest animal in the world? / जगातील सर्वात उंच प्राणी कोणता?", options: ["Elephant / हत्ती","Horse / घोडा","Giraffe / जिराफ","Camel / उंट"], answerIndex: 2 },
+
+{ id: 38, difficulty: "hard", question: "Who wrote the Indian National Anthem? / भारतीय राष्ट्रगीत कोणी लिहिले?", options: ["Mahatma Gandhi / महात्मा गांधी","Rabindranath Tagore / रवींद्रनाथ टागोर","Subhash Chandra Bose / सुभाषचंद्र बोस","Bal Gangadhar Tilak / बाळ गंगाधर टिळक"], answerIndex: 1 },
+
+{ id: 39, difficulty: "hard", question: "Which planet is closest to the Sun? / सूर्याच्या सर्वात जवळचा ग्रह कोणता?", options: ["Venus / शुक्र","Earth / पृथ्वी","Mercury / बुध","Mars / मंगळ"], answerIndex: 2 },
+
+{ id: 40, difficulty: "hard", question: "Which country is famous for the Great Wall? / ग्रेट वॉलसाठी प्रसिद्ध देश कोणता?", options: ["India / भारत","China / चीन","Japan / जपान","USA / अमेरिका"], answerIndex: 1 },
+
+{ id: 41, difficulty: "hard", question: "Which is the largest state in India by area? / क्षेत्रफळानुसार भारतातील सर्वात मोठे राज्य कोणते?", options: ["Maharashtra / महाराष्ट्र","Madhya Pradesh / मध्य प्रदेश","Rajasthan / राजस्थान","Uttar Pradesh / उत्तर प्रदेश"], answerIndex: 2 },
+
+{ id: 42, difficulty: "hard", question: "How many rings are there in the Olympic symbol? / ऑलिम्पिक चिन्हात किती वलये आहेत?", options: ["4 / चार","5 / पाच","6 / सहा","7 / सात"], answerIndex: 1 },
+
+{ id: 43, difficulty: "hard", question: "Which river is considered the longest in India? / भारतातील सर्वात लांब नदी कोणती मानली जाते?", options: ["Yamuna / यमुना","Krishna / कृष्णा","Ganga / गंगा","Godavari / गोदावरी"], answerIndex: 2 },
+
+{ id: 44, difficulty: "hard", question: "Which metal is heavier than iron? / खालीलपैकी कोणता धातू लोखंडापेक्षा जड आहे?", options: ["Aluminum / अॅल्युमिनियम","Copper / तांबे","Gold / सोने","Silver / चांदी"], answerIndex: 2 },
+
+{ id: 45, difficulty: "hard", question: "What is the largest organ in the human body? / मानवी शरीरातील सर्वात मोठा अवयव कोणता?", options: ["Heart / हृदय","Brain / मेंदू","Skin / त्वचा","Liver / यकृत"], answerIndex: 2 },
+
+{ id: 46, difficulty: "hard", question: "Which gas do plants release during photosynthesis? / प्रकाशसंश्लेषण प्रक्रियेत झाडे कोणता वायू सोडतात?", options: ["Oxygen / प्राणवायू","Carbon dioxide / कार्बन डायऑक्साइड","Nitrogen / नायट्रोजन","Hydrogen / हायड्रोजन"], answerIndex: 0 },
+
+{ id: 47, difficulty: "hard", question: "Who was the first woman Prime Minister of India? / भारताच्या पहिल्या महिला पंतप्रधान कोण होत्या?", options: ["Sarojini Naidu / सरोजिनी नायडू","Indira Gandhi / इंदिरा गांधी","Pratibha Patil / प्रतिभा पाटील","Sonia Gandhi / सोनिया गांधी"], answerIndex: 1 },
+
+{ id: 48, difficulty: "hard", question: "Which is the largest mammal in the world? / जगातील सर्वात मोठा सस्तन प्राणी कोणता?", options: ["Elephant / हत्ती","Blue Whale / निळी व्हेल","Giraffe / जिराफ","Hippopotamus / दरियाई घोडा"], answerIndex: 1 },
+
+{ id: 49, difficulty: "hard", question: "Which programming language is known for web development? / वेब डेव्हलपमेंटसाठी प्रसिद्ध प्रोग्रामिंग भाषा कोणती?", options: ["Python / पायथन","JavaScript / जावास्क्रिप्ट","C++ / सी++","Java / जावा"], answerIndex: 1 },
+
+{ id: 50, difficulty: "hard", question: "How many states are there in India? / भारतात किती राज्ये आहेत?", options: ["27 / सत्तावीस","28 / अठ्ठावीस","29 / एकोणतीस","30 / तीस"], answerIndex: 1 },
+
+];
+
+// ================= QUIZ LOGIC =================
+
+let selectedQuestions=[];
+let currentIndex=0;
+let selected=null;
+let score=0;
+let timeLeft=30;
+let totalTime=0;
+let timer;
+let userName="";
+
+function shuffle(arr){
+  return arr.sort(()=>Math.random()-0.5);
+}
+
+function startQuiz(){
+  userName=document.getElementById("username").value.trim();
+  if(!userName){alert("Please enter your name");return;}
+
+  const easy = QUESTION_BANK.filter(q=>q.difficulty==="easy");
+  const medium = QUESTION_BANK.filter(q=>q.difficulty==="medium");
+
+  const selectedEasy = shuffle(easy).slice(0,15);
+  const selectedMedium = shuffle(medium).slice(0,5);
+
+  selectedQuestions = shuffle([...selectedEasy,...selectedMedium]);
+
+  document.getElementById("login").style.display="none";
+  document.getElementById("quiz").style.display="block";
+
+  loadQuestion();
+}
+
+function loadQuestion(){
+  selected=null;
+  timeLeft=30;
+  updateTimerUI();
+  document.getElementById("nextBtn").style.display="none";
+
+  const q=selectedQuestions[currentIndex];
+
+  document.getElementById("qNumber").innerText=currentIndex+1;
+  document.getElementById("questionText").innerText=q.question;
+
+  const optionsDiv=document.getElementById("options");
+  optionsDiv.innerHTML="";
+
+  q.options.forEach((opt,i)=>{
+    const btn=document.createElement("button");
+    btn.innerText=opt;
+    btn.className="option-btn";
+    btn.onclick=()=>selectOption(i,btn);
+    optionsDiv.appendChild(btn);
+  });
+
+  timer=setInterval(()=>{
+    timeLeft--;
+    totalTime++;
+    updateTimerUI();
+    if(timeLeft<=0){
+      clearInterval(timer);
+      nextQuestion();
+    }
+  },1000);
+}
+
+function updateTimerUI(){
+  document.getElementById("timeLeft").innerText=timeLeft;
+  document.getElementById("timerProgress").style.width=(timeLeft/30*100)+"%";
+}
+
+function selectOption(index,btn){
+  if(selected!==null) return;
+  selected=index;
+  clearInterval(timer);
+
+  const correctAnswer=selectedQuestions[currentIndex].answerIndex;
+
+  if(index===correctAnswer){
+    btn.classList.add("correct");
+    score++;
+  }else{
+    btn.classList.add("wrong");
+    document.querySelectorAll(".option-btn")[correctAnswer].classList.add("correct");
+  }
+
+  document.getElementById("nextBtn").style.display="block";
+}
+
+function nextQuestion(){
+  clearInterval(timer);
+
+  if(currentIndex+1>=selectedQuestions.length){
+    finishQuiz();
+    return;
+  }
+
+  currentIndex++;
+  loadQuestion();
+}
+
+async function finishQuiz(){
+
+  document.getElementById("quiz").style.display="none";
+  document.getElementById("result").style.display="block";
+
+  const avgTime=(totalTime/20).toFixed(1);
+  const finalScore=Math.round(score*10-avgTime);
+
+  document.getElementById("result").innerHTML=
+  `<h2>Quiz Completed 🎉</h2>
+   <p>Name: ${userName}</p>
+   <p>Correct: ${score}/20</p>
+   <p>Score: ${finalScore}</p>
+   <p>Average Time: ${avgTime}s</p>
+   <p>Logging out in 5 seconds...</p>`;
+
+  await fetch(SHEET_WEBHOOK_URL,{
+    method:"POST",
+    mode:"no-cors",
+    body: JSON.stringify({
+      name:userName,
+      correct:score,
+      total:20,
+      score:finalScore,
+      avgTime:avgTime,
+      timestamp:new Date().toISOString()
+    })
+  });
+
+  setTimeout(()=>location.reload(),5000);
+}
+
+</script>
+</body>
+</html>
